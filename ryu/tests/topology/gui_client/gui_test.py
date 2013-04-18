@@ -21,7 +21,7 @@ from nose.plugins.skip import SkipTest
 from selenium import webdriver
 from selenium.webdriver.common.action_chains import ActionChains
 
-import gui_elements
+from gui_elements import DriverUtil, Menu, Dialog, Topology, LinkList, FlowList
 
 
 # GUI app address
@@ -44,8 +44,12 @@ class TestGUI(unittest.TestCase):
     def setUpClass(cls):
         cls._set_driver()
         ok_(cls.driver, 'driver dose not setting.')
-        cls.el = gui_elements.Elements(cls.driver)
-        cls.el.register_contents()
+        cls.util = DriverUtil(cls.driver)
+        cls.menu = Menu(cls.driver)
+        cls.dialog = Dialog(cls.driver)
+        cls.topology = Topology(cls.driver)
+        cls.link_list = LinkList(cls.driver)
+        cls.flow_list = FlowList(cls.driver)
 
     # called after the TestCase run.
     @classmethod
@@ -55,7 +59,7 @@ class TestGUI(unittest.TestCase):
     # called before an individual test_* run.
     def setUp(self):
         self.driver.get(BASE_URL + "/")
-        self.el.wait_for_displayed(self.el.dialog.body())
+        self.util.wait_for_displayed(self.dialog.body)
 
     # called in to setUpClass().
     @classmethod
@@ -70,55 +74,55 @@ class TestGUI(unittest.TestCase):
     def test_default(self):
         ## input-dialog
         # is_displayed, host=GUI_HOST, port=8080
-        dialog = self.el.dialog
-        ok_(dialog.body().is_displayed())
-        eq_(GUI_HOST, dialog.host().get_attribute("value"))
-        eq_('8080', dialog.port().get_attribute("value"))
+        dialog = self.dialog
+        ok_(dialog.body.is_displayed())
+        eq_(GUI_HOST, dialog.host.get_attribute("value"))
+        eq_('8080', dialog.port.get_attribute("value"))
 
         # click "cancel"
-        dialog.cancel().click()
+        dialog.cancel.click()
 
         ## topology
         # "Disconnected", not switches
-        topology = self.el.topology
-        ok_(re.search(r"Disconnected", topology.body().text))
-        ok_(not topology.switches())
+        topology = self.topology
+        ok_(re.search(r"Disconnected", topology.body.text))
+        ok_(not topology.switches)
 
         ## link-list
         # is_displayed, no data
-        link = self.el.link_list
-        ok_(link.body().is_displayed())
-        ok_(not link.rows())
+        link = self.link_list
+        ok_(link.body.is_displayed())
+        ok_(not link.rows)
 
         ## flow-list
         # is_displayed, no data
-        flow = self.el.flow_list
-        ok_(flow.body().is_displayed())
-        ok_(not flow.rows())
+        flow = self.flow_list
+        ok_(flow.body.is_displayed())
+        ok_(not flow.rows)
 
     def _test_contents_close_open(self, target, opener):
         # close
-        target.close().click()
-        ok_(not target.body().is_displayed())
+        target.close.click()
+        ok_(not target.body.is_displayed())
 
         # open
         opener.click()
-        ok_(self.el.wait_for_displayed(target.body()))
+        ok_(self.util.wait_for_displayed(target.body))
 
     def test_contents_close_open(self):
-        menu = self.el.menu
+        menu = self.menu
         ## input-dialog
-        dialog = self.el.dialog
-        self._test_contents_close_open(dialog, menu.dialog())
-        dialog.close().click()
+        dialog = self.dialog
+        self._test_contents_close_open(dialog, menu.dialog)
+        dialog.close.click()
 
         ## link-list
-        link = self.el.link_list
-        self._test_contents_close_open(link, menu.link_list())
+        link = self.link_list
+        self._test_contents_close_open(link, menu.link_list)
 
         ## flow-list
-        flow = self.el.flow_list
-        self._test_contents_close_open(flow, menu.flow_list())
+        flow = self.flow_list
+        self._test_contents_close_open(flow, menu.flow_list)
 
     def _test_contents_draggble(self, target):
         # TODO: fail if location over to window size
@@ -134,19 +138,19 @@ class TestGUI(unittest.TestCase):
         eq_(target.location['y'], yoffset)
 
     def test_contents_draggble(self):
-        self.el.dialog.close().click()
+        self.dialog.close.click()
 
         ## menu
-        self._test_contents_draggble(self.el.menu.titlebar())
+        self._test_contents_draggble(self.menu.titlebar)
 
         ## topology
-        self._test_contents_draggble(self.el.topology.titlebar())
+        self._test_contents_draggble(self.topology.titlebar)
 
         ## link-list
-        self._test_contents_draggble(self.el.link_list.titlebar())
+        self._test_contents_draggble(self.link_list.titlebar)
 
         ## flow-list
-        self._test_contents_draggble(self.el.flow_list.titlebar())
+        self._test_contents_draggble(self.flow_list.titlebar)
 
     def test_contents_resize(self):
         # TODO: contents resize
@@ -154,18 +158,18 @@ class TestGUI(unittest.TestCase):
 
     def test_connected(self):
         # input host
-        host = self.el.dialog.host()
+        host = self.dialog.host
         host.clear()
         host.send_keys(REST_HOST)
 
         # input port
-        port = self.el.dialog.port()
+        port = self.dialog.port
         port.clear()
         port.send_keys(REST_PORT)
 
         # click "Launch"
-        self.el.dialog.launch().click()
-        ok_(self.el.wait_for_text(self.el.topology.body(), "Connected"))
+        self.dialog.launch.click()
+        ok_(self.util.wait_for_text(self.topology.body, "Connected"))
 
 
 if __name__ == "__main__":
