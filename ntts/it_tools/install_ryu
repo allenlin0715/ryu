@@ -1,0 +1,2 @@
+#!/bin/sh
+sudo -E pip install -r tools/pip-requires && sudo python setup.py install --force

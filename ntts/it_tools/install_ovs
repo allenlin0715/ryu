@@ -1,0 +1,43 @@
+#!/bin/sh
+set -x
+
+OVS_CTL='/usr/local/share/openvswitch/scripts/ovs-ctl'
+
+OVS_MOD='openvswitch'
+BRCOMPAT_MOD='brcompat'
+MOD_DIR="/lib/modules/$(uname -r)/extra/"
+
+OVS_SHARE_DIR='/usr/local/share/openvswitch'
+OVS_ETC_DIR='/usr/local/etc/openvswitch'
+OVS_BIN_WILDCARD='/usr/local/bin/ovs*'
+
+uninstall_ovs() {
+    sudo $OVS_CTL stop
+    sudo modprobe -r $OVS_MOD
+    sudo modprobe -r $BRCOMPAT_MOD
+    sudo rm -f $MOD_DIR/$OVS_MOD.ko
+    sudo rm -f $MOD_DIR/$BRCOMPAT_MOD.ko
+    sudo rm -f $OVS_BIN_WILDCARD
+    sudo rm -rf $OVS_ETC_DIR
+    sudo rm -rf $OVS_SHARE_DIR
+}
+
+install_ovs() {
+    ./boot.sh
+    ./configure --with-linux=/lib/modules/$(uname -r)/build
+    make clean
+    make
+    sudo make install
+    sudo make modules_install
+    sudo depmod -a
+}
+
+show_ovs_timestamp() {
+    date
+    ls -al $MOD_DIR
+    ls -al $OVS_BIN_WILDCARD
+}
+
+uninstall_ovs
+install_ovs
+show_ovs_timestamp

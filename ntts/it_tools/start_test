@@ -1,0 +1,117 @@
+#!/bin/sh
+
+if [ $# -lt 2 ]; then
+    echo "USAGE: $0 RUN_TEST_MOD OF_VERSION"
+    exit 1
+fi
+
+
+RUN_TEST_MOD=$1
+OF_VERSION=$2
+
+TARGET_BR="br-tester"
+DUMMY_IF="p1"
+OVS_CTL='/usr/local/share/openvswitch/scripts/ovs-ctl'
+CONTROLLER="tcp:127.0.0.1"
+TMPFILE="/tmp/it.log"
+TEST_TIMEOUT=60
+LOG_FINISHED="TEST_FINISHED"
+LOG_COMPLETED='Completed=\[True\]'
+
+
+run_test() {
+    if [ -f ${TMPFILE} ]; then
+        rm -f ${TMPFILE}
+    fi
+    touch ${TMPFILE}
+
+    ryu-manager ${RUN_TEST_MOD} > ${TMPFILE} 2>&1 &
+    ryu_pid=$!
+
+    # start tests
+    sudo ovs-vsctl set-controller ${TARGET_BR} ${CONTROLLER}
+    
+    timeout=${TEST_TIMEOUT}
+    while [ $timeout -gt 0 ]
+    do
+        grep ${LOG_FINISHED} ${TMPFILE} >/dev/null
+        if [ $? -eq 0 ]; then
+            # finished
+            break
+        fi
+        
+        if ! ps ${ryu_pid} >/dev/null; then
+            # ryu-manager process down.
+            break
+        fi
+        timeout=`expr $timeout - 1`
+        sleep 1
+    done
+    
+    if ps ${ryu_pid} >/dev/null; then
+        # SIGINT signal is required to display the ERROR msg.
+        sudo kill -s SIGINT ${ryu_pid}
+    fi
+
+    sudo timeout -s SIGKILL 1s ovs-vsctl del-controller ${TARGET_BR}
+    
+    if [ $timeout -eq 0 ]; then
+        echo "TEST TIMEOUT!!" >> ${TMPFILE}
+    fi
+    
+    grep ${LOG_COMPLETED} ${TMPFILE} >/dev/null 2>&1
+    return $?
+}
+
+
+# check
+RC=1
+if ! which ryu-manager >/dev/null; then
+    echo "ryu-manager is not fund."
+elif [ ! -f ${OVS_CTL} ]; then
+    echo "${OVS_CTL} is not fund."
+else
+    RC=0
+fi
+if [ $? -ne 0 ]; then
+    exit $RC
+fi
+
+# start ovs
+sudo ${OVS_CTL} start
+RC=$?
+if [ $? -ne 0 ]; then
+    exit $RC
+fi
+
+# create br and add port
+if sudo ovs-vsctl list-br |grep ${TARGET_BR} >/dev/null; then
+    sudo ovs-vsctl del-br ${TARGET_BR}
+fi
+sudo ovs-vsctl add-br ${TARGET_BR}
+if [ "${OF_VERSION}" = "0x03" ]; then
+    sudo ovs-vsctl set bridge ${TARGET_BR} protocols="[OpenFlow10, OpenFlow12]"
+fi
+
+sudo ifconfig ${TARGET_BR} down
+sudo ip link add ${DUMMY_IF} type dummy
+sudo ovs-vsctl add-port ${TARGET_BR} ${DUMMY_IF}
+sudo ovs-vsctl list-ports ${TARGET_BR} | grep ${DUMMY_IF} >/dev/null
+RC=$?
+
+# run test
+if [ ${RC} -eq 0 ]; then
+    run_test
+    RC=$?
+fi
+
+sudo ovs-vsctl del-br ${TARGET_BR}
+sudo ${OVS_CTL} stop
+sudo ip link del ${DUMMY_IF}
+
+if [ -f ${TMPFILE} ]; then
+    cat ${TMPFILE}
+    rm -f ${TMPFILE}
+fi
+
+exit ${RC}
