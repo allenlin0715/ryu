@@ -16,7 +16,7 @@
 import unittest
 from nose.tools import ok_, eq_
 
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, STDOUT
 from multiprocessing import Process, Queue
 import time
 
@@ -33,8 +33,7 @@ WRAPPER = './tools/with_venv.sh'
 RYU_MGR = './bin/ryu-manager'
 
 
-#class TestWithOVS12(unittest.TestCase):
-class TestWithOVS12(object):
+class TestWithOVS12(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.mn = Mininet()
@@ -55,51 +54,33 @@ class TestWithOVS12(object):
 
     @classmethod
     def tearDownClass(cls):
-        t.exit()
         cls.mn.stop()
 
-    def setUp(self):
-        self.processes = []
-
-    def tearDown(self):
-        for p in self.processes:
-            p.terminate()
-
-    def _run_ryu_manager(self, app, q):
-        cmd = [WRAPPER, RYU_MGR, app]
-        p = Popen(cmd, stdout=PIPE, stderr=PIPE)
-        while True:
-            q.put(p.stderr.readline().strip())
-
-    def test_add_flow_v10(self):
-        app = 'ryu/tests/integrated/test_add_flow_v10.py'
-        q = Queue()
-
-        args = (app, q)
-        p = Process(target=self._run_ryu_manager, args=args)
-        p.start()
-        self.processes.append(p)
+    def _run_ryu_manager_and_check_output(self, app):
+        cmd = [RYU_MGR, app]
+        p = Popen(cmd, stdout=PIPE, stderr=STDOUT)
+        print "ryu-manager's pid is %s" % p.pid
 
         start = time.time()
         while True:
             if time.time() - start > TIMEOUT:
-                ok_(False, msg='TIMEOUT')
+                raise Exception('TIMEOUT')
 
-            if q.empty():
+            if p.poll() != None:
+                raise Exception('Another ryu-manager already running?')
+
+            line = p.stdout.readline().strip()
+            if line == '':
                 time.sleep(1)
                 continue
 
-            line = q.get()
             print line
             if line.find('TEST_FINISHED') != -1:
                 ok_(line.find('Completed=[True]') != -1)
-                
+                p.terminate()
+                p.communicate()  # wait for subprocess is terminated
+                break
 
-if __name__ == '__main__':
-    TestWithOVS12.setUpClass()
-    test = TestWithOVS12()
-    test.setUp()
-    test.test_add_flow_v10()
-    test.tearDown()
-    TestWithOVS12.tearDownClass()
-
+    def test_add_flow_v10(self):
+        app = 'ryu/tests/integrated/test_add_flow_v10.py'
+        self._run_ryu_manager_and_check_output(app)
