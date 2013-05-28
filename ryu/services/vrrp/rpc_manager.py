@@ -13,7 +13,6 @@ from contextlib import closing
 VRRP_RPC_PORT = 51718
 CONF_KEY_PRIORITY = "priority"
 CONF_KEY_ADVERTISEMENT_INTERVAL = "advertisement_interval"
-CONF_KEY_PORT_NO = "port_no"
 CONF_KEY_PORT_IFNAME = "ifname"
 CONF_KEY_PORT_IP_ADDR = "ip_address"
 CONF_KEY_PORT_VLAN_ID = "vlan_id"
@@ -26,11 +25,10 @@ class VRRPParam(object):
         self.ip_address = ip_address
 
 
-    def setPort(self, ifname, port_no, ip_address, priority, vlan_id=None):
+    def setPort(self, ifname, ip_address, priority, vlan_id=None):
         self.port = {
             CONF_KEY_PORT_IP_ADDR: ip_address,
             CONF_KEY_PORT_IFNAME: ifname,
-            CONF_KEY_PORT_NO: port_no,
             CONF_KEY_PRIORITY: priority,
             CONF_KEY_PORT_VLAN_ID: vlan_id
         }
