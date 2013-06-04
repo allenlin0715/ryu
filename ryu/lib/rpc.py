@@ -62,7 +62,7 @@ class MessageEncoder(object):
 
     def create_request(self, method, params):
         assert isinstance(method, str)
-        assert isinstance(params, list)
+        assert isinstance(params, (list, dict))
         msgid = self._create_msgid()
         return (self._packer.pack([MessageType.REQUEST, msgid, method,
                                   params]), msgid)
@@ -75,7 +75,7 @@ class MessageEncoder(object):
 
     def create_notification(self, method, params):
         assert isinstance(method, str)
-        assert isinstance(params, list)
+        assert isinstance(params, (list, dict))
         return self._packer.pack([MessageType.NOTIFY, method, params])
 
     def get_and_dispatch_messages(self, data, disp_table):
